@@ -5,8 +5,8 @@
 
 #define VALOR_MAXIMO_DEFAULT 128
 
-#define HIJO_IZQ(n) ((2*n))
-#define HIJO_DER(n) (((2*n)+1))
+#define HIJO_IZQ(n) ((2*n)+1)
+#define HIJO_DER(n) ((2*n)+2)
 #define PADRE(n) (((n-1)/2))
 
 struct heap
@@ -15,31 +15,88 @@ struct heap
 	size_t cant_elementos;
 	size_t max_cant_elementos;
 	void **arreglo_heap;
-}
+};
 
 
 /* F AUXILIARES */
-void swap( void *a, void *b )
+void swap( void **a, void **b )
 {
-	void tmp = *a;
+	void* tmp = *a;
 
 	*a = *b;
-	*b = temp;
+	*b = tmp;
 }
 
-/*void upheap( heap_t *heap, size_t posNodo )
+void up_heap( heap_t *heap )
 {
-	if( posNodo != 0 )
+	size_t ini = heap_cantidad(heap);
+	
+	while( ini > 0 )
 	{
-		size_t padrepos = PADRE(posNodo);
+		size_t padre = PADRE(ini);
 		
-		if( heap->f_cmp(heap->arreglo_heap[padrepos], heap->arreglo_heap[posNodo]) > 0 )
+		int comparar = heap->f_cmp(heap->arreglo_heap[ini], heap->arreglo_heap[padre]);
+		
+		if( comparar > 0 )
 		{
-			swap( &heap->arreglo_heap[padrepos], &heap->arreglo[posNodo] );
-			upheap( heap, padrepos );
+			swap( &heap->arreglo_heap[ini], &heap->arreglo_heap[padre] );
+			ini = padre;
+		}
+		else
+		{
+			break;
 		}
 	}
-}*/
+}
+
+bool heap_redimensionar( heap_t* heap, size_t nuevo_tamanio )
+{
+	void **data_nueva = realloc( heap->arreglo_heap, nuevo_tamanio * sizeof( void * ) );
+	
+	if( !data_nueva )
+		return false;
+		
+	heap->arreglo_heap = data_nueva;
+	heap->max_cant_elementos = nuevo_tamanio;
+	
+	return true;
+}
+
+void down_heap( void**dato, size_t start, size_t end, cmp_func_t cmp)
+{
+	size_t root = start;
+	
+	while( (root * 2 + 1) <= end )
+	{
+		size_t hijo = (root * 2 + 1);
+		size_t cambio = root;
+		
+		if( cmp(dato[cambio], dato[hijo]) < 0 )
+			cambio = hijo;
+			
+		if( hijo+1 <=end && cmp(dato[cambio], dato[hijo+1]) > 0 )
+			cambio = hijo + 1;
+		
+		if( cambio== root )
+			return;
+		else
+		{
+			swap( &dato[root], &dato[cambio] );
+			root = cambio;
+		}
+	}
+}
+
+void heapify( void *datos, size_t cant, cmp_func_t cmp )
+{
+	size_t mitad = (cant - 2) / 2;
+	
+	while( mitad >= 0 )
+	{
+		down_heap(datos, mitad, cant - 1, cmp);
+		mitad = mitad - 1;
+	}
+}
 
 /* FIN F AUXILIARES */
 
@@ -54,7 +111,7 @@ heap_t *heap_crear(cmp_func_t cmp)
 	nHeap->cant_elementos = 0;
 	nHeap->max_cant_elementos = VALOR_MAXIMO_DEFAULT;
 
-	nHeap->arreglo_heap = malloc( sizeof(void *) * nHeap->max_cant_elementos )
+	nHeap->arreglo_heap = malloc( sizeof(void *) * nHeap->max_cant_elementos );
 
 	if( !nHeap->arreglo_heap )
 	{
@@ -70,7 +127,7 @@ heap_t *heap_crear(cmp_func_t cmp)
 
 void heap_destruir(heap_t *heap, void destruir_elemento(void *e))
 {	
-	if( destruir_dato )
+	if( destruir_elemento )
 		for( size_t i = 0 ;i < heap->max_cant_elementos; i++)
 			if( heap->arreglo_heap[i] )
 				destruir_elemento(heap->arreglo_heap[i]);
@@ -95,65 +152,54 @@ bool heap_encolar(heap_t *heap, void *elem)
 {
 	if( !elem )
 		return false;
-
- 	// nota: hay que redimensionar!!!
  	
-	/*heap->arreglo_heap[cant_elementos] = elem;
-	
-	heap->cant_elementos++;
-	
-	upheap(heap->cant_elementos - 1);*/
-	heap->cant_elementos++;
-	
-	size_t i = heap->cant_elementos - 1;
-	
-	while( i > 0 && heap->f_cmp(heap->arreglo_heap[ PADRE(i) ], elem) < 0 )
-	{
-		heap->arreglo_heap[ i ] = heap->arreglo_heap[ PADRE(i) ];
-		i = PADRE(i);
+ 	if( heap_cantidad(heap) >= heap->max_cant_elementos )
+ 	{		
+		if( !heap_redimensionar(heap, ( 2 * ( heap_cantidad(heap) + 1 ) )) )
+			return false;
 	}
-	heap->arreglo_heap[i] = elem;
+	heap->arreglo_heap[heap->cant_elementos] = elem;
+	up_heap(heap);
+	heap->cant_elementos++;
+	
+	return true;
 }
 
 void *heap_desencolar(heap_t *heap)
 {
-	void *max = heap->arreglo_heap[0]
-	arreglo_heap[0] = heap->arreglo_heap[heap->cant_elementos -1];
+	if( heap_esta_vacio(heap) )
+		return NULL;
+		
+	void *max = heap_ver_max( heap );
+	
+	heap->arreglo_heap[0] = heap->arreglo_heap[ heap->cant_elementos -1 ];
+	
+	down_heap( heap->arreglo_heap, 0, heap_cantidad(heap) - 1, heap->f_cmp );
 	
 	heap->cant_elementos--;
 	
-	max_heapify( heap, 0 ); // heapify es heapifiar a partir de lo heapifiado
-}
+	if( heap_cantidad( heap ) < ( heap->max_cant_elementos / 4 ) )
+		if( (heap->max_cant_elementos / 2) >= VALOR_MAXIMO_DEFAULT )
+			heap_redimensionar( heap, heap_cantidad(heap) / 2 );
 
-void max_heapify( heap *heap, pos )
-{
-	size_t izq_index = HIJO_IZQ(pos);
-	size_t der_index = HIJO_DER(pos);
-	size_t pos_mayor = pos;
-	
-	if( izq_index < heap->cant_elementos && heap->f_cmp(heap->arreglo_heap[izq_index], heap->arreglo_heap[pos]) > 0 )
-	{
-		pos_mayor = izq_index;
-	}
-	else
-	{
-		pos_mayor = pos;
-	}
-	
-	if( der_index < heap->cant_elementos && heap->f_cmp(heap->arreglo_heap[der_index], heap->arreglo_heap[pos_mayor]) > 0 )
-	{
-		pos_mayor = der_index;
-	}
-	
-	if( pos_mayor != pos )
-	{
-		swap( &heap->arreglo_heap[pos], &heap->arreglo_heap[pos_mayor]);
-		max_heapify( heap, pos_mayor );
-	}
+	return max;
 }
 
 void *heap_ver_max(const heap_t *heap)
 {
-	return heap->heap[0];
+	return (!heap || heap_esta_vacio(heap)) ? NULL : heap->arreglo_heap[0];
 }
 
+void heap_sort(void *elementos[], size_t largo, cmp_func_t cmp)
+{
+	heapify( elementos, largo, cmp );
+	printf("heap sort wii\n");
+	size_t final = largo - 1;
+	
+	while( final > 0 )
+	{
+		swap( &elementos[final], &elementos[0] );
+		final--;
+		down_heap(elementos, 0, final, cmp);
+	}
+}
